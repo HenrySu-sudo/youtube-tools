@@ -17,7 +17,37 @@ under `[caption-spike]` in DevTools.
    files as the acceptance evidence. The visual CC setting does not remove
    advertised tracks, so case (c) should produce the same full list.
 
-## What the code validates
+## Browser validation result (2026-09-21)
+
+An actual Chrome 150.0.7871.47 headless session with this directory supplied by
+`--load-extension` navigated to three watch pages and ran the same extraction
+logic in the YouTube page's main world through CDP. The player response exposed
+the advertised tracks, but every `fetch(track.baseUrl + "&fmt=json3")`
+returned HTTP 200 with an empty body. This was true for manual and `asr` tracks.
+Thus the signed URL as currently supplied needs an additional, unavailable
+validation token/session state; moving the request from Node to the page world
+does **not** solve it on its own. No cue samples are reported because none were
+actually received.
+
+| Video | Page-world tracks tested | HTTP/body result |
+| --- | --- | --- |
+| `dQw4w9WgXcQ` | `en` manual, `en` ASR | both 200 / 0 bytes |
+| `jNQXAC9IVRw` | `en` manual | 200 / 0 bytes |
+| `M7lc1UVf-VE` | `en` manual, `en` ASR | both 200 / 0 bytes |
+
+`scripts/browser-verify.mjs` is the reproducible CDP harness. Start Chrome with
+a temporary user profile, `--remote-debugging-port=9222`, and
+`--load-extension=<repo>`, then run:
+
+```bash
+node scripts/browser-verify.mjs 9222 dQw4w9WgXcQ jNQXAC9IVRw M7lc1UVf-VE
+```
+
+The CC visual preference is not represented in `captionTracks`, so turning CC
+off does not change track discovery; it also cannot make the failed timedtext
+reply usable.
+
+## Track discovery validation
 
 The player response exposed tracks for these three public videos when checked
 on 2026-09-21:
@@ -29,19 +59,16 @@ on 2026-09-21:
 | `M7lc1UVf-VE` | manual + `asr` | manual and auto available |
 
 The supplied `node scripts/verify-captions.mjs <id>` independently reads the
-watch-page player response and reports the available tracks. It intentionally
-also demonstrates the risk this spike addresses: when run outside a browser it
-received HTTP 200 with an empty HTML response from the signed timedtext URL,
-even with a YouTube referer and browser-like user agent. Therefore the
-recommended MVP implementation is the page-world fetch in `page-extractor.js`,
-not a background/service-worker request or direct server request.
+watch-page player response and reports the available tracks. It too receives an
+HTTP 200 empty response from the signed timedtext URL.
 
 ## Decision and fallback
 
-Use the signed `captionTracks[].baseUrl` + `fmt=json3` route as the primary
-path. It is the only route that exposes a complete, timestamped cue list before
-playback. The URL is ephemeral and must be taken fresh from each player
-response; handle missing tracks and failed fetches explicitly.
+Do **not** use the signed `captionTracks[].baseUrl` + `fmt=json3` route as the
+MVP primary path yet. It is theoretically the only route that can expose a
+complete timestamped list before playback, but the browser experiment shows that
+the current URL is insufficient under this Chrome session. A follow-up spike is
+needed to identify the required YouTube validation token/session parameter.
 
 DOM scraping (`.ytp-caption-segment`) is only a fallback: it yields text visible
 at the current playback position, normally lacks canonical start/duration data,
@@ -51,9 +78,7 @@ normal path.
 
 ## Verification performed
 
-`node --check content.js`, `node --check page-extractor.js`, and `node --check
-scripts/verify-captions.mjs` pass. The command-line verifier confirmed the
-three public pages above advertise their listed tracks, but cannot constitute a
-browser page-world fetch test: its timedtext replies were empty in this runtime.
-The repository contains the unpacked extension required to run that final
-browser-only check; no cue samples are claimed until a browser download exists.
+`node --check content.js`, `node --check page-extractor.js`, `node --check
+scripts/verify-captions.mjs`, and `node --check scripts/browser-verify.mjs`
+pass. The page-world experiment above is browser evidence, not a claimed cue
+success; its empty replies are the key feasibility finding.
