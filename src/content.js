@@ -1,9 +1,11 @@
 import { openDatabase } from './storage.js';
+import { lookupWord, normalizeWord } from './dictionary.js';
 
 const ROOT_ID = 'youtube-english-extractor-panel';
 let panelRoot = null;
 let currentVideoId = null;
 let navigationTimer = null;
+let dictionaryPopup = null;
 
 function isWatchPage() {
   return location.hostname.endsWith('youtube.com') && location.pathname === '/watch' && Boolean(new URLSearchParams(location.search).get('v'));
@@ -37,11 +39,17 @@ function createPanel() {
       button:hover { color:#0f0f0f; }
       .body { padding:18px 12px; color:#606060; min-height:58px; }
       .collapsed .body { display:none; }
+      .dictionary { position:fixed; z-index:2147483647; width:260px; padding:12px; background:#fff; border:1px solid #d4d4d4; border-radius:8px; box-shadow:0 4px 18px #0003; color:#0f0f0f; font:14px/1.45 Arial,sans-serif; }
+      .dictionary[hidden] { display:none; } .dictionary-word { font-size:18px; font-weight:700; } .dictionary-phonetic,.dictionary-meta,.dictionary-empty { color:#606060; } .dictionary button { margin-top:8px; border:1px solid #ddd; border-radius:4px; font-size:13px; color:#333; }
     </style>
     <section class="panel" aria-label="English subtitles panel">
       <header class="header"><span class="title">English subtitles</span><button type="button" aria-label="Collapse panel" aria-expanded="true">−</button></header>
-      <div class="body">Subtitles loading...</div>
+      <div class="body">Subtitles loading... Select one word in a subtitle to look it up offline.</div>
     </section>`;
+  dictionaryPopup = document.createElement('div');
+  dictionaryPopup.className = 'dictionary';
+  dictionaryPopup.hidden = true;
+  panelRoot.append(dictionaryPopup);
   const panel = panelRoot.querySelector('.panel');
   const button = panelRoot.querySelector('button');
   button.addEventListener('click', () => {
@@ -52,6 +60,24 @@ function createPanel() {
   secondary.prepend(host);
   return true;
 }
+
+function showDictionaryPopup(text, position) {
+  if (!dictionaryPopup) return;
+  const normalized = normalizeWord(text);
+  if (!normalized || /\s/.test(text.trim())) {
+    dictionaryPopup.innerHTML = '<div class="dictionary-empty">短语和整句暂不提供词典释义。</div><button type="button">收藏</button>';
+  } else {
+    const entry = lookupWord(normalized);
+    dictionaryPopup.innerHTML = entry
+      ? `<div><span class="dictionary-word">${entry.word}</span> <span class="dictionary-phonetic">/${entry.phonetic}/</span></div><div class="dictionary-meta">${entry.partOfSpeech}${entry.inflected ? ` · 原形：${entry.lemma}` : ''}</div><div>${entry.definition}</div><button type="button">收藏</button>`
+      : `<div class="dictionary-empty">未收录“${normalized}”，请尝试其他单词。</div><button type="button">收藏</button>`;
+  }
+  dictionaryPopup.style.left = `${Math.max(8, Math.min(position.x, window.innerWidth - 280))}px`;
+  dictionaryPopup.style.top = `${Math.max(8, Math.min(position.y + 12, window.innerHeight - 160))}px`;
+  dictionaryPopup.hidden = false;
+}
+document.addEventListener('mouseup', (event) => { const selection = window.getSelection()?.toString().trim(); if (selection) showDictionaryPopup(selection, { x: event.clientX, y: event.clientY }); });
+document.addEventListener('mousedown', (event) => { if (dictionaryPopup && !dictionaryPopup.contains(event.target)) dictionaryPopup.hidden = true; }, true);
 
 function initialize() {
   if (!isWatchPage()) return removePanel();
