@@ -5,6 +5,24 @@ let panelRoot = null;
 let currentVideoId = null;
 let navigationTimer = null;
 
+function installPageCapture() {
+  if (document.documentElement.dataset.youtubeEnglishCaptureInstalled) return;
+  document.documentElement.dataset.youtubeEnglishCaptureInstalled = 'true';
+  const script = document.createElement('script');
+  script.src = chrome.runtime.getURL('page-capture.js');
+  script.async = false;
+  document.documentElement.append(script);
+  script.remove();
+}
+
+window.addEventListener('youtube-english-extractor:cues', ({ detail }) => {
+  if (!detail?.videoId || !Array.isArray(detail.cues)) return;
+  console.info('[youtube-english-extractor] captured player timedtext', {
+    videoId: detail.videoId,
+    cueCount: detail.cues.length,
+  });
+});
+
 function isWatchPage() {
   return location.hostname.endsWith('youtube.com') && location.pathname === '/watch' && Boolean(new URLSearchParams(location.search).get('v'));
 }
@@ -55,6 +73,7 @@ function createPanel() {
 
 function initialize() {
   if (!isWatchPage()) return removePanel();
+  installPageCapture();
   const id = videoId();
   if (id === currentVideoId && document.getElementById(ROOT_ID)) return;
   currentVideoId = id;

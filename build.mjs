@@ -13,4 +13,5 @@ await build({
   minify: false,
 });
 await cp('manifest.json', 'dist/manifest.json');
+await cp('src/page-capture.js', 'dist/page-capture.js');
 console.log('Built dist/');
