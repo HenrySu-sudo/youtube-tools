@@ -1,0 +1,19 @@
+{
+  "manifest_version": 3,
+  "name": "YouTube English Extractor",
+  "version": "0.1.0",
+  "description": "A local panel for collecting English subtitles and expressions from YouTube.",
+  "permissions": ["storage"],
+  "host_permissions": ["*://*.youtube.com/*"],
+  "background": {
+    "service_worker": "background.js",
+    "type": "module"
+  },
+  "content_scripts": [
+    {
+      "matches": ["*://*.youtube.com/*"],
+      "js": ["content.js"],
+      "run_at": "document_idle"
+    }
+  ]
+}
