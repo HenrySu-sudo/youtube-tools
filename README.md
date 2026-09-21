@@ -1,29 +1,41 @@
-# youtube-tools
-A utility tool that identifies dialogue from YouTube videos to generate transcripts and features the ability to collect and organize similar words and expressions.
 # YouTube English Extractor
 
 Chrome MV3 extension skeleton for a local English subtitle panel on YouTube.
 
-## Build
+## Timedtext capture spike
+
+YouTube's current timedtext endpoint requires a video-bound PoToken. The
+extension therefore does not construct its own URL or solve BotGuard. Its
+main-world script observes player-issued timedtext resources and only retries a
+URL that already contains `pot`, preserving `c=WEB`; it converts a successful
+`json3` body into real `{ start, duration, text }` cues and sends them to the
+content script. This is necessarily post-load: it cannot provide the full
+transcript before the player has requested a caption resource.
+
+`scripts/browser-verify.mjs` enables captions, checks visible
+`.ytp-caption-segment` text, and records player timedtext response metadata.
+Run it against a Chrome started with a fresh profile after completing the normal
+consent flow; it must not use a personal Chrome profile:
 
 ```bash
-npm install
-npm run build
+node scripts/browser-verify.mjs 9222 dQw4w9WgXcQ jNQXAC9IVRw M7lc1UVf-VE
 ```
 
-The build writes a loadable `dist/` directory. The extension currently includes the panel shell and local storage schema; subtitle extraction and collection UI are intentionally left for later work.
+No cue samples are claimed by this repository: the automated Chrome session in
+this environment failed TLS handshakes to YouTube, so it could not establish
+whether the player itself displayed captions. The harness covers manual, ASR,
+and captions-disabled cases; a successful run must retain its real output as
+acceptance evidence.
 
-## Load in Chrome
-
-1. Open `chrome://extensions` and enable **Developer mode**.
-2. Choose **Load unpacked** and select this repository's `dist/` directory.
-3. Open a YouTube video (`youtube.com/watch?v=...`). The panel appears at the top of the right sidebar.
-
-The content script removes the panel when leaving a watch page and reinitializes it on YouTube SPA navigation. Styling is isolated in Shadow DOM. IndexedDB creates `videos` and `items` object stores on first run.
-
-## Verify
+## Build and verify
 
 ```bash
+npm ci
 npm run check
 npm run build
 ```
+
+The build writes a loadable `dist/` directory. Load it from
+`chrome://extensions`, then open a YouTube watch page; the panel appears at
+the top of the right sidebar. Panel styling is isolated in Shadow DOM and the
+local IndexedDB schema contains `videos` and `items` stores.
