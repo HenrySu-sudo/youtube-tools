@@ -1,0 +1,19 @@
+{
+  "manifest_version": 3,
+  "name": "YouTube Caption Extraction Spike",
+  "version": "0.1.0",
+  "description": "Exports English YouTube caption cues for a feasibility spike.",
+  "web_accessible_resources": [
+    {
+      "resources": ["page-extractor.js"],
+      "matches": ["https://www.youtube.com/*"]
+    }
+  ],
+  "content_scripts": [
+    {
+      "matches": ["https://www.youtube.com/watch*"],
+      "js": ["content.js"],
+      "run_at": "document_idle"
+    }
+  ]
+}
